@@ -1,7 +1,7 @@
 import {
-  Difficulty,
   ReportResponse,
   RealtimeTokenResponse,
+  Scenario,
   SessionEvent,
   SessionResponse,
   TranscriptTurn,
@@ -30,8 +30,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function createSession(input: {
-  difficulty: Difficulty;
   task: string;
+  scenario: Scenario;
   locale: string;
 }): Promise<SessionResponse> {
   return request<SessionResponse>("/sessions", {

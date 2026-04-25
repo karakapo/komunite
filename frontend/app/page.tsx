@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { IntroPanel } from "../components/intro-panel";
 import { LiveInterview } from "../components/live-interview";
 import { ReportPanel } from "../components/report-panel";
+import { InterviewMode, RealtimeSessionController } from "../lib/realtime-session";
 import {
   completeSession,
   createSession,
@@ -12,62 +13,44 @@ import {
   fetchVisuals
 } from "../lib/api";
 import {
-  Difficulty,
+  LiveTranscriptPartial,
   ReportResponse,
+  Scenario,
   SessionResponse,
   TranscriptTurn,
   Visual
 } from "../lib/types";
 
 type AppStage = "intro" | "live" | "report";
-type InterviewMode =
-  | "visual-generation-pending"
-  | "realtime-connecting"
-  | "mic-active"
-  | "ai-speaking"
-  | "user-speaking"
-  | "reconnecting"
-  | "report-generating";
-
-const seededTranscript: TranscriptTurn[] = [
-  {
-    speaker: "simulated_persona",
-    text: "Most weeks I juggle customer notes across Slack, Notion, and screenshots before I summarize anything.",
-    started_at: new Date().toISOString(),
-    ended_at: new Date().toISOString()
-  },
-  {
-    speaker: "user",
-    text: "Tell me about the last time that workflow slowed you down.",
-    started_at: new Date().toISOString(),
-    ended_at: new Date().toISOString()
-  },
-  {
-    speaker: "simulated_persona",
-    text: "Yesterday I had to pull three call snippets manually because I could not trust the auto summary enough to share it.",
-    started_at: new Date().toISOString(),
-    ended_at: new Date().toISOString()
-  }
-];
 
 export default function Home() {
-  const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [scenario, setScenario] = useState<Scenario>("motivasyon");
   const [stage, setStage] = useState<AppStage>("intro");
+  const [introStep, setIntroStep] = useState<"select" | "details">("select");
   const [starting, setStarting] = useState(false);
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [visuals, setVisuals] = useState<Visual[]>([]);
   const [interviewMode, setInterviewMode] =
     useState<InterviewMode>("visual-generation-pending");
-  const [transcript, setTranscript] = useState<TranscriptTurn[]>(seededTranscript);
+  const [transcript, setTranscript] = useState<TranscriptTurn[]>([]);
+  const [livePartial, setLivePartial] = useState<LiveTranscriptPartial>(null);
   const [report, setReport] = useState<ReportResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const visualsPollingRef = useRef<number | null>(null);
+  const realtimeControllerRef = useRef<RealtimeSessionController | null>(null);
+  const transcriptRef = useRef<TranscriptTurn[]>([]);
+
+  useEffect(() => {
+    transcriptRef.current = transcript;
+  }, [transcript]);
 
   useEffect(() => {
     return () => {
       if (visualsPollingRef.current) {
         window.clearInterval(visualsPollingRef.current);
       }
+
+      void realtimeControllerRef.current?.dispose();
     };
   }, []);
 
@@ -82,8 +65,8 @@ export default function Home() {
       try {
         setError(null);
         const nextSession = await createSession({
-          difficulty,
-          task: "ai-assistant-validation",
+          task: "ai-study-planner-validation",
+          scenario,
           locale: "en-US"
         });
 
@@ -97,7 +80,7 @@ export default function Home() {
         if (!active) {
           return;
         }
-        setError(nextError instanceof Error ? nextError.message : "Unknown error");
+        setError(nextError instanceof Error ? nextError.message : "Bilinmeyen bir hata olustu");
       }
     }
 
@@ -106,7 +89,7 @@ export default function Home() {
     return () => {
       active = false;
     };
-  }, [difficulty, stage]);
+  }, [scenario, stage]);
 
   async function hydrateVisuals(sessionId: string) {
     if (visualsPollingRef.current) {
@@ -144,12 +127,28 @@ export default function Home() {
     setStarting(true);
 
     try {
+      setTranscript([]);
+      setLivePartial(null);
+      setReport(null);
       setInterviewMode("visual-generation-pending");
-      await fetchRealtimeToken(session.id);
-      setInterviewMode("realtime-connecting");
+      const bootstrap = await fetchRealtimeToken(session.id);
+      const controller = new RealtimeSessionController(bootstrap, {
+        onModeChange: setInterviewMode,
+        onFinalTranscript: (turn) => {
+          setTranscript((current) => [...current, turn]);
+        },
+        onPartialTranscript: setLivePartial,
+        onError: (message) => setError(message)
+      });
+
+      realtimeControllerRef.current = controller;
       setStage("live");
+      await controller.start();
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Unknown error");
+      void realtimeControllerRef.current?.dispose();
+      realtimeControllerRef.current = null;
+      setStage("intro");
+      setError(nextError instanceof Error ? nextError.message : "Bilinmeyen bir hata olustu");
     } finally {
       setStarting(false);
     }
@@ -163,12 +162,15 @@ export default function Home() {
     setInterviewMode("report-generating");
 
     try {
-      await completeSession(session.id, transcript);
+      await realtimeControllerRef.current?.end();
+      await completeSession(session.id, transcriptRef.current);
       const nextReport = await fetchReport(session.id);
       setReport(nextReport);
       setStage("report");
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Unknown error");
+      setError(nextError instanceof Error ? nextError.message : "Bilinmeyen bir hata olustu");
+    } finally {
+      realtimeControllerRef.current = null;
     }
   }
 
@@ -183,8 +185,11 @@ export default function Home() {
       <div className="content-shell">
         {stage === "intro" && (
           <IntroPanel
-            difficulty={difficulty}
-            onDifficultyChange={setDifficulty}
+            scenario={scenario}
+            flowStep={introStep}
+            onScenarioChange={setScenario}
+            onContinue={() => setIntroStep("details")}
+            onBack={() => setIntroStep("select")}
             onStart={handleStart}
             starting={starting || !session}
             visualsLoading={visualsLoading}
@@ -196,8 +201,8 @@ export default function Home() {
             session={session}
             visuals={visuals}
             transcript={transcript}
+            livePartial={livePartial}
             interviewMode={interviewMode}
-            onModeChange={setInterviewMode}
             onEndCall={handleEndCall}
             report={report}
           />

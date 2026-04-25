@@ -35,8 +35,8 @@ def create_session(payload: SessionCreateRequest) -> SessionResponse:
     return SessionResponse(
         id=session.id,
         task=session.task,
+        scenario=session.scenario,
         locale=session.locale,
-        difficulty=session.difficulty,
         persona_name=session.persona_name,
         persona_summary=session.persona_summary,
         opening_line=session.opening_line,

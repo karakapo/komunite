@@ -1,43 +1,47 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ReportResponse, SessionResponse, TranscriptTurn, Visual } from "../lib/types";
-
-type InterviewMode =
-  | "visual-generation-pending"
-  | "realtime-connecting"
-  | "mic-active"
-  | "ai-speaking"
-  | "user-speaking"
-  | "reconnecting"
-  | "report-generating";
+import { InterviewMode } from "../lib/realtime-session";
+import {
+  LiveTranscriptPartial,
+  ReportResponse,
+  SessionResponse,
+  TranscriptTurn,
+  Visual
+} from "../lib/types";
 
 type LiveInterviewProps = {
   session: SessionResponse;
   visuals: Visual[];
   transcript: TranscriptTurn[];
+  livePartial: LiveTranscriptPartial;
   interviewMode: InterviewMode;
-  onModeChange: (mode: InterviewMode) => void;
   onEndCall: () => void;
   report: ReportResponse | null;
 };
 
 const modeLabels: Record<InterviewMode, string> = {
-  "visual-generation-pending": "Visuals pending",
-  "realtime-connecting": "Connecting realtime voice",
-  "mic-active": "Mic active",
-  "ai-speaking": "AI speaking",
-  "user-speaking": "User speaking",
-  reconnecting: "Reconnecting",
-  "report-generating": "Generating report"
+  "visual-generation-pending": "Gorseller bekleniyor",
+  "realtime-connecting": "Canli ses baglantisi kuruluyor",
+  "mic-active": "Mikrofon acik",
+  "ai-speaking": "Yapay zeka konusuyor",
+  "user-speaking": "Kullanici konusuyor",
+  reconnecting: "Yeniden baglaniyor",
+  "report-generating": "Rapor hazirlaniyor"
+};
+
+const scenarioLabels: Record<SessionResponse["scenario"], string> = {
+  motivasyon: "Mahir / Hacettepe Universitesi",
+  fake_interest: "Huseyin / Ankara Ataturk Lisesi",
+  hard_mode: "Ulas / Bozyazi Anadolu Lisesi"
 };
 
 export function LiveInterview({
   session,
   visuals,
   transcript,
+  livePartial,
   interviewMode,
-  onModeChange,
   onEndCall,
   report
 }: LiveInterviewProps) {
@@ -59,14 +63,6 @@ export function LiveInterview({
     return () => window.clearInterval(interval);
   }, [interviewMode, readyVisuals.length]);
 
-  useEffect(() => {
-    if (interviewMode === "realtime-connecting") {
-      const timer = window.setTimeout(() => onModeChange("mic-active"), 1400);
-      return () => window.clearTimeout(timer);
-    }
-    return undefined;
-  }, [interviewMode, onModeChange]);
-
   const currentVisual = readyVisuals[activePose] ?? null;
 
   return (
@@ -74,12 +70,12 @@ export function LiveInterview({
       <div className="panel stage-panel">
         <div className="stage-topbar">
           <div>
-            <div className="eyebrow">LIVE INTERVIEW</div>
+            <div className="eyebrow">CANLI GORUSME</div>
             <h2>{session.persona_name}</h2>
             <p>{session.persona_summary}</p>
           </div>
           <button type="button" className="ghost-button" onClick={onEndCall}>
-            End call
+            Gorusmeyi bitir
           </button>
         </div>
 
@@ -87,52 +83,26 @@ export function LiveInterview({
           <span className={`mode-pill mode-${interviewMode.replaceAll("_", "-")}`}>
             {modeLabels[interviewMode]}
           </span>
-          <span className="progress-copy">
-            Difficulty: {session.difficulty.toUpperCase()} / Score target: 80+
-          </span>
+          <span className="progress-copy">{scenarioLabels[session.scenario]}</span>
         </div>
 
         <div className="avatar-stage">
           {currentVisual ? (
             <img
-              alt={`Avatar pose ${currentVisual.pose_index + 1}`}
+              alt={`Avatar poz ${currentVisual.pose_index + 1}`}
               className={`avatar-image ${
                 interviewMode === "ai-speaking" ? "is-speaking" : "is-listening"
               }`}
               src={currentVisual.image_url ?? undefined}
             />
           ) : (
-            <div className="avatar-placeholder">Preparing avatar poses...</div>
+            <div className="avatar-placeholder">Avatar pozlari hazirlaniyor...</div>
           )}
 
           <div className="avatar-overlay-card">
-            <span>Opening line</span>
+            <span>Acilis cumlesi</span>
             <strong>{session.opening_line}</strong>
           </div>
-        </div>
-
-        <div className="control-row">
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => onModeChange("user-speaking")}
-          >
-            Simulate user speaking
-          </button>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => onModeChange("ai-speaking")}
-          >
-            Simulate AI response
-          </button>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => onModeChange("reconnecting")}
-          >
-            Simulate reconnect
-          </button>
         </div>
 
         <div className="score-preview">
@@ -140,10 +110,10 @@ export function LiveInterview({
             <span>{report?.overall_score ?? "--"}</span>
           </div>
           <div>
-            <h3>Session momentum</h3>
+            <h3>Gorusme ivmesi</h3>
             <p>
-              Track real evidence, follow-up depth, and question quality as the
-              call unfolds.
+              Gorisme boyunca gercek kanitlari, takip sorularinin derinligini ve
+              soru kalitesini izle.
             </p>
           </div>
         </div>
@@ -152,10 +122,10 @@ export function LiveInterview({
       <aside className="panel transcript-panel">
         <div className="transcript-header">
           <div>
-            <div className="eyebrow">LIVE TRANSCRIPT</div>
-            <h3>Conversation stream</h3>
+            <div className="eyebrow">CANLI DOKUM</div>
+            <h3>Konusma akisi</h3>
           </div>
-          <span>{transcript.length} turns</span>
+          <span>{transcript.length} tur</span>
         </div>
 
         <div className="transcript-list">
@@ -164,10 +134,16 @@ export function LiveInterview({
               key={`${turn.started_at}-${index}`}
               className={`transcript-turn ${turn.speaker}`}
             >
-              <span>{turn.speaker === "user" ? "You" : session.persona_name}</span>
+              <span>{turn.speaker === "user" ? "Sen" : session.persona_name}</span>
               <p>{turn.text}</p>
             </article>
           ))}
+          {livePartial ? (
+            <article className={`transcript-turn ${livePartial.speaker}`}>
+              <span>{livePartial.speaker === "user" ? "Sen" : session.persona_name}</span>
+              <p>{livePartial.text}</p>
+            </article>
+          ) : null}
         </div>
       </aside>
     </section>

@@ -1,19 +1,23 @@
 "use client";
 
-import { Difficulty } from "../lib/types";
+import { useMemo } from "react";
+import { Scenario } from "../lib/types";
 
 type ScenarioOption = {
-  id: string;
+  id: Scenario;
   title: string;
   kicker: string;
+  summary: string;
   role: string;
   focus: string;
-  difficultyLabel: string;
 };
 
 type IntroPanelProps = {
-  difficulty: Difficulty;
-  onDifficultyChange: (difficulty: Difficulty) => void;
+  scenario: Scenario;
+  flowStep: "select" | "details";
+  onScenarioChange: (scenario: Scenario) => void;
+  onContinue: () => void;
+  onBack: () => void;
   onStart: () => void;
   starting: boolean;
   visualsLoading: boolean;
@@ -21,111 +25,168 @@ type IntroPanelProps = {
 
 const scenarioOptions: ScenarioOption[] = [
   {
-    id: "ai-assistant-validation",
-    title: "AI Assistant Workflow",
-    kicker: "Discovery interview",
-    role: "You are a PM testing whether an AI assistant truly helps daily work.",
-    focus: "Ask about last real workflows, pain points, and switching triggers.",
-    difficultyLabel: "Medium"
+    id: "motivasyon",
+    title: "Mahir / Hacettepe Universitesi",
+    kicker: "Senaryo 1",
+    summary: "Yuzeyde AI planlama ister gibi gorunen ama aslen disiplin ve aliskanlik problemi yasayan ogrenci.",
+    role: "Sen, AI ile calisma planlama app'ini anlatan ama asil problemi kesfetmeye calisan oyuncusun.",
+    focus: "Tool ihtiyaci gibi duran istegin altinda plan yapip birakma ve dikkat daginikligi olup olmadigini ortaya cikar."
   },
   {
-    id: "meeting-notes-copilot",
-    title: "Meeting Notes Copilot",
-    kicker: "Coming soon",
-    role: "You will validate note capture and summary behavior in real meetings.",
-    focus: "Keep this one locked for now.",
-    difficultyLabel: "Soon"
+    id: "fake_interest",
+    title: "Huseyin / Ankara Ataturk Lisesi",
+    kicker: "Senaryo 2",
+    summary: "Mantikli sekilde olumlu gorunen ama gercekte yeni tool'a gecmeye vakti olmayan tip ogrencisi.",
+    role: "Sen, ilgiyi gercek talep sanmadan once mevcut sistemi ve switching cost'u sorgulayan oyuncusun.",
+    focus: "Asil problemin planlama degil zaman baskisi ve yeni bir sistem ogrenme maliyeti oldugunu cikar."
   },
   {
-    id: "internal-search-agent",
-    title: "Internal Search Agent",
-    kicker: "Coming soon",
-    role: "You will explore how teams retrieve buried knowledge across tools.",
-    focus: "Keep this one locked for now.",
-    difficultyLabel: "Soon"
+    id: "hard_mode",
+    title: "Ulas / Bozyazi Anadolu",
+    kicker: "Senaryo 3",
+    summary: "Verimli olmaya takilmis ama derindeki sorunu kendi de netlestiremeyen final senesi ogrenci.",
+    role: "Sen, belirsiz verimlilik sikayetinin altindaki mental load ve karar yorgunlugunu bulmaya calisan oyuncusun.",
+    focus: "Gunluk akisi, son verimli gunu ve onu durduran seyleri deserek gercek sikismayi ortaya cikar."
   }
 ];
 
+const appOption = {
+  title: "AI Study Tool",
+  kicker: "Urun 01",
+  summary:
+    "AI ile sana ozel calisma plani yapan, seni takip eden ve verimini artirmayi vadeden uygulama.",
+  role:
+    "Sen, bu urunun gercekten ihtiyac olup olmadigini anlamaya calisan oyuncusun.",
+  focus:
+    "Amac urunu satmak degil; kullanicinin gercekten tool problemi mi, yoksa daha derin bir problem mi yasadigini bulmak."
+};
+
 export function IntroPanel({
-  difficulty,
-  onDifficultyChange,
+  scenario,
+  flowStep,
+  onScenarioChange,
+  onContinue,
+  onBack,
   onStart,
   starting,
   visualsLoading
 }: IntroPanelProps) {
-  const activeScenario = scenarioOptions[0];
+  const activeScenario = useMemo(
+    () => scenarioOptions.find((item) => item.id === scenario) ?? scenarioOptions[0],
+    [scenario]
+  );
 
   return (
     <section className="panel hero-panel">
-      <div className="eyebrow">WIRO AI / SCENARIO SELECT</div>
-      <h1 className="hero-title">Pick a scenario and jump into the interview.</h1>
-      <p className="hero-copy">
-        More scenarios will live here. For now, one scenario is open and ready.
-      </p>
+      <div className="eyebrow">WIRO AI / HIKAYE AKISI</div>
 
-      <div className="scenario-strip">
-        {scenarioOptions.map((scenario, index) => {
-          const isActive = index === 0;
+      <div className="stepper-row" aria-label="Akis adimlari">
+        <div
+          className={`step-pill ${flowStep === "select" ? "is-active" : "is-complete"}`}
+        >
+          1. Hikaye sec
+        </div>
+        <div className={`step-pill ${flowStep === "details" ? "is-active" : ""}`}>
+          2. Hikaye detaylari
+        </div>
+        <div className="step-pill is-muted">3. Oyuna basla</div>
+      </div>
 
-          return (
+      {flowStep === "select" ? (
+        <>
+          <h1 className="hero-title">Ilk olarak hikayeni sec.</h1>
+          <p className="hero-copy">
+            Bu oyunda tek bir urun var: AI destekli study tool. Ilk adimda urunu
+            seciyorsun, ikinci adimda ise hangi tip kullaniciyla konusacagini belirliyorsun.
+          </p>
+
+          <div className="scenario-strip">
             <button
-              key={scenario.id}
-              className={`scenario-chip ${isActive ? "is-active" : "is-muted"}`}
+              className="scenario-chip is-active"
               type="button"
-              aria-expanded={isActive}
-              onClick={() => {
-                if (isActive) {
-                  onDifficultyChange(difficulty);
-                }
-              }}
+              aria-pressed="true"
             >
-              <span className="scenario-chip-kicker">{scenario.kicker}</span>
-              <strong className="scenario-chip-title">{scenario.title}</strong>
-              <small className="scenario-chip-badge">{scenario.difficultyLabel}</small>
+              <span className="scenario-chip-kicker">{appOption.kicker}</span>
+              <strong className="scenario-chip-title">{appOption.title}</strong>
+              <p className="scenario-chip-copy">{appOption.summary}</p>
+              <small className="scenario-chip-badge">Tek urun</small>
             </button>
-          );
-        })}
-      </div>
+          </div>
 
-      <div className="scenario-detail">
-        <div className="scenario-detail-card role-card">
-          <span>Our role</span>
-          <strong>{activeScenario.role}</strong>
-        </div>
+          <div className="cta-row">
+            <button
+              className="primary-button"
+              onClick={onContinue}
+              type="button"
+            >
+              Devam et
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <h1 className="hero-title">Gorusme akisini sec.</h1>
+          <p className="hero-copy">
+            Urun sabit, ama gorusmenin akisi degisiyor. Asagida istedigin
+            gorusmeyi secip oyunu baslat.
+          </p>
 
-        <div className="scenario-detail-card">
-          <span>Focus</span>
-          <p>{activeScenario.focus}</p>
-        </div>
+          <div className="scenario-strip">
+            {scenarioOptions.map((item) => {
+              const isSelected = item.id === activeScenario.id;
 
-        <div className="scenario-detail-card compact">
-          <span>Difficulty</span>
-          <strong>{difficulty === "easy" ? "Easy" : difficulty === "hard" ? "Hard" : "Medium"}</strong>
-        </div>
-      </div>
+              return (
+                <button
+                  key={item.id}
+                  className={`scenario-chip ${isSelected ? "is-active" : "is-muted"}`}
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => onScenarioChange(item.id)}
+                >
+                  <span className="scenario-chip-kicker">{item.kicker}</span>
+                  <strong className="scenario-chip-title">{item.title}</strong>
+                  <p className="scenario-chip-copy">{item.summary}</p>
+                  <small className="scenario-chip-badge">Gorusme</small>
+                </button>
+              );
+            })}
+          </div>
 
-      <div className="difficulty-strip">
-        {(["easy", "medium", "hard"] as Difficulty[]).map((option) => (
-          <button
-            key={option}
-            className={`difficulty-pill ${option === difficulty ? "is-active" : ""}`}
-            onClick={() => onDifficultyChange(option)}
-            type="button"
-          >
-            {option}
-          </button>
-        ))}
-      </div>
+          <div className="scenario-detail">
+            <div className="scenario-detail-card role-card">
+              <span>Senin rolun</span>
+              <strong>{appOption.role}</strong>
+            </div>
 
-      <div className="cta-row">
-        <button className="primary-button" onClick={onStart} disabled={starting}>
-          {starting ? "Preparing session..." : "Start interview"}
-        </button>
-        <div className="background-status">
-          <span className={`status-dot ${visualsLoading ? "pending" : "ready"}`} />
-          {visualsLoading ? "Preparing visuals" : "Visuals ready"}
-        </div>
-      </div>
+            <div className="scenario-detail-card">
+              <span>Hikaye odagi</span>
+              <p>{appOption.focus}</p>
+            </div>
+          </div>
+
+          <div className="detail-summary-grid">
+            <div className="scenario-detail-card compact">
+              <span>Gorsel durum</span>
+              <strong>{visualsLoading ? "Hazirlaniyor" : "Hazir"}</strong>
+            </div>
+          </div>
+
+          <div className="cta-row">
+            <div className="cta-group">
+              <button className="ghost-button" onClick={onBack} type="button">
+                Geri don
+              </button>
+              <button className="primary-button" onClick={onStart} disabled={starting} type="button">
+                {starting ? "Oyun hazirlaniyor..." : "Oyuna basla"}
+              </button>
+            </div>
+            <div className="background-status">
+              <span className={`status-dot ${visualsLoading ? "pending" : "ready"}`} />
+              {visualsLoading ? "Karakter gorselleri hazirlaniyor" : "Karakter gorselleri hazir"}
+            </div>
+          </div>
+        </>
+      )}
     </section>
   );
 }

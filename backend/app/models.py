@@ -6,7 +6,7 @@ from typing import Dict, List, Literal
 from pydantic import BaseModel, Field
 
 
-Difficulty = Literal["easy", "medium", "hard"]
+Scenario = Literal["motivasyon", "fake_interest", "hard_mode"]
 TranscriptSpeaker = Literal["user", "simulated_persona"]
 VisualStatus = Literal["pending", "ready"]
 
@@ -16,16 +16,16 @@ def utcnow() -> datetime:
 
 
 class SessionCreateRequest(BaseModel):
-    difficulty: Difficulty
     task: str
+    scenario: Scenario = "motivasyon"
     locale: str = "en-US"
 
 
 class SessionResponse(BaseModel):
     id: str
     task: str
+    scenario: Scenario
     locale: str
-    difficulty: Difficulty
     persona_name: str
     persona_summary: str
     opening_line: str
@@ -35,6 +35,7 @@ class SessionResponse(BaseModel):
 class RealtimeTokenResponse(BaseModel):
     session_id: str
     provider: str
+    task_id: str
     websocket_url: str
     ephemeral_token: str
     voice_profile: str
@@ -82,8 +83,8 @@ class ReportResponse(BaseModel):
 class SessionRecord(BaseModel):
     id: str
     task: str
+    scenario: Scenario
     locale: str
-    difficulty: Difficulty
     persona_name: str
     persona_summary: str
     opening_line: str

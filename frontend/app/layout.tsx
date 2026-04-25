@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Mom Test Live Lab",
-  description: "Gamified realtime Mom Test interview simulator powered by Wiro AI"
+  title: "Komunite Canli Gorusme",
+  description: "Wiro AI destekli, oyunlastirilmis canli Mom Test gorusme simulasyonu"
 };
 
 export default function RootLayout({
@@ -12,7 +12,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="tr">
       <body>{children}</body>
     </html>
   );

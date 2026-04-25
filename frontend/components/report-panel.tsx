@@ -11,15 +11,15 @@ export function ReportPanel({ report }: ReportPanelProps) {
     <section className="panel report-panel">
       <div className="report-head">
         <div>
-          <div className="eyebrow">POST CALL REPORT</div>
-          <h2>How well you applied The Mom Test</h2>
+          <div className="eyebrow">GORUSME SONRASI RAPOR</div>
+          <h2>The Mom Test yaklasimini ne kadar iyi uyguladin</h2>
         </div>
         <div className="report-score">{report.overall_score}</div>
       </div>
 
       <div className="report-grid">
         <div className="report-column">
-          <h3>Category scores</h3>
+          <h3>Kategori puanlari</h3>
           <div className="score-list">
             {Object.entries(report.category_scores).map(([category, score]) => (
               <div key={category} className="score-row">
@@ -29,7 +29,7 @@ export function ReportPanel({ report }: ReportPanelProps) {
             ))}
           </div>
 
-          <h3>Strengths</h3>
+          <h3>Guclu yanlar</h3>
           <ul>
             {report.strengths.map((item) => (
               <li key={item}>{item}</li>
@@ -38,14 +38,14 @@ export function ReportPanel({ report }: ReportPanelProps) {
         </div>
 
         <div className="report-column">
-          <h3>What to improve</h3>
+          <h3>Gelistirilecek alanlar</h3>
           <ul>
             {report.mistakes.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
 
-          <h3>Next steps</h3>
+          <h3>Sonraki adimlar</h3>
           <ul>
             {report.next_steps.map((item) => (
               <li key={item}>{item}</li>
@@ -55,11 +55,11 @@ export function ReportPanel({ report }: ReportPanelProps) {
       </div>
 
       <div className="evidence-block">
-        <h3>Evidence from transcript</h3>
+        <h3>Dokumden alinan kanitlar</h3>
         <div className="evidence-list">
           {report.evidence.map((item) => (
             <article key={`${item.speaker}-${item.quote}`} className="evidence-card">
-              <span>{item.speaker === "user" ? "User evidence" : "Persona context"}</span>
+              <span>{item.speaker === "user" ? "Kullanici kaniti" : "Persona baglami"}</span>
               <strong>{item.quote}</strong>
               <p>{item.insight}</p>
             </article>

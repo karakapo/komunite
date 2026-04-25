@@ -1,10 +1,10 @@
-export type Difficulty = "easy" | "medium" | "hard";
+export type Scenario = "motivasyon" | "fake_interest" | "hard_mode";
 
 export type SessionResponse = {
   id: string;
   task: string;
+  scenario: Scenario;
   locale: string;
-  difficulty: Difficulty;
   persona_name: string;
   persona_summary: string;
   opening_line: string;
@@ -38,6 +38,11 @@ export type TranscriptTurn = {
   started_at: string;
   ended_at: string;
 };
+
+export type LiveTranscriptPartial = {
+  speaker: "user" | "simulated_persona";
+  text: string;
+} | null;
 
 export type ReportEvidence = {
   quote: string;
