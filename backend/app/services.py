@@ -51,7 +51,9 @@ def build_realtime_system_instructions(session: SessionRecord) -> str:
         f"Task context: {session.task}. "
         f"Locale: {session.locale}. "
         "Stay fully in character, answer naturally, keep replies concise and conversational, "
-        "and do not reveal the hidden problem too early.\n\n"
+        "and do not reveal the hidden problem too early. "
+        "Do not volunteer detailed past stories, concrete incidents, or your deepest pain points unless the interviewer earns them with follow-up questions. "
+        "On the very first turn, give only a short greeting or short surface-level answer and wait for the interviewer to lead.\n\n"
         f"{scenario_block}"
     )
     return sanitize_realtime_instructions(instructions)
@@ -86,16 +88,40 @@ def build_wiro_headers() -> dict[str, str]:
     return headers
 
 
-def create_wiro_realtime_session(session: SessionRecord) -> tuple[str, str]:
-    payload: dict[str, object] = {
+def normalize_wiro_locale(locale: str) -> str:
+    language = locale.split("-", 1)[0].strip().lower()
+    return language or "auto"
+
+
+def build_realtime_payload(session: SessionRecord) -> dict[str, object]:
+    if settings.realtime_owner_slug.lower() == "elevenlabs":
+        payload: dict[str, object] = {
+            "voice_id": settings.elevenlabs_voice_id or settings.voice_profile,
+            "system_instructions": build_realtime_system_instructions(session),
+        }
+        language = normalize_wiro_locale(session.locale)
+        if language != "auto":
+            payload["language"] = language
+        if settings.elevenlabs_tts_model_id:
+            payload["tts_model_id"] = settings.elevenlabs_tts_model_id
+        payload["first_message"] = "Merhaba, başlayabiliriz."
+        return payload
+
+    return {
         "voice": settings.voice_profile,
         "system_instructions": build_realtime_system_instructions(session),
         "transcription_model": settings.transcription_model,
+        "input_audio_format": settings.input_audio_format,
+        "input_audio_rate": settings.input_audio_rate,
         "output_audio_format": settings.output_audio_format,
         "output_audio_rate": settings.output_audio_rate,
         "turn_detection_threshold": settings.turn_detection_threshold,
         "turn_detection_silence_ms": settings.turn_detection_silence_ms,
     }
+
+
+def create_wiro_realtime_session(session: SessionRecord) -> tuple[str, str]:
+    payload = build_realtime_payload(session)
     if settings.realtime_payload_json:
         try:
             override_payload = json.loads(settings.realtime_payload_json)
@@ -131,8 +157,14 @@ def create_wiro_realtime_session(session: SessionRecord) -> tuple[str, str]:
 
     body = response.json()
     if not body.get("result"):
-        errors = body.get("errors") or ["Unknown Wiro API error"]
-        raise HTTPException(status_code=502, detail=f"Wiro API error: {', '.join(errors)}")
+        errors = body.get("errors")
+        if isinstance(errors, list):
+            error_message = ", ".join(str(error) for error in errors) or "Unknown Wiro API error"
+        elif errors:
+            error_message = str(errors)
+        else:
+            error_message = "Unknown Wiro API error"
+        raise HTTPException(status_code=502, detail=f"Wiro API error: {error_message}")
 
     task_id = body.get("taskid")
     token = body.get("socketaccesstoken")
@@ -173,6 +205,8 @@ def build_scenario_prompt(scenario: Scenario) -> str:
         "- Speak in Turkish.\n"
         "- Sound like a real student, not an evaluator.\n"
         "- Do not dump your full backstory in one answer.\n"
+        "- Do not immediately give detailed real-life stories unless the interviewer asks for a specific example.\n"
+        "- If a question is broad, answer briefly first and leave details for follow-up.\n"
         "- At first, stay somewhat surface level and show mild interest in the product idea.\n"
         "- Reveal the deeper problem only if the interviewer asks strong behavioral follow-up questions.\n"
         "- Never explicitly say 'my real problem is ...'.\n"
@@ -376,11 +410,11 @@ def fetch_wiro_realtime_task_debug(task_id: str) -> RealtimeTaskDebugResponse:
 
 def summarize_user_strengths(user_turns: list[TranscriptTurn]) -> list[str]:
     if not user_turns:
-        return ["You completed the session, but no user transcript turns were captured."]
+        return ["Oturum tamamlandi ancak kullanicidan kayda gecen bir konusma parcasi alinmadi."]
     return [
-        "You asked at least one concrete follow-up about a recent workflow.",
-        "You kept the conversation focused on behavior instead of pure opinions.",
-        "You gave the simulated user room to describe operational friction in detail.",
+        "Yakın zamandaki gerçek bir akışa dair en az bir somut takip sorusu sordun.",
+        "Konuşmayı fikirlerden çok davranış ve deneyim etrafında tuttun.",
+        "Simüle edilen kullanıcının operasyonel sıkıntıları açması için alan bıraktın.",
     ]
 
 
@@ -388,14 +422,14 @@ def summarize_user_mistakes(user_turns: list[TranscriptTurn]) -> list[str]:
     joined = " ".join(turn.text.lower() for turn in user_turns)
     mistakes: list[str] = []
     if "would" in joined or "will" in joined:
-        mistakes.append("Some questions drifted toward hypothetical future behavior.")
+        mistakes.append("Bazı sorular varsayımsal gelecek davranışlarına kaydı.")
     if not any("last" in turn.text.lower() or "recent" in turn.text.lower() for turn in user_turns):
-        mistakes.append("You did not anchor enough questions in a specific past event.")
+        mistakes.append("Soruları yeterince belirli ve geçmişte yaşanmış bir olaya bağlamadın.")
     if not any("why" in turn.text.lower() or "what happened" in turn.text.lower() for turn in user_turns):
-        mistakes.append("Your follow-ups could go deeper on causes and decision points.")
+        mistakes.append("Takip soruları nedenler ve karar anları konusunda daha derine inebilirdi.")
     if not mistakes:
         mistakes.append(
-            "The session was strong overall; next gains will come from sharper evidence-seeking probes."
+            "Oturum genel olarak güçlüydü; bir sonraki gelişim alanı daha keskin kanıt arayan sorular olacak."
         )
     return mistakes
 
@@ -409,7 +443,7 @@ def build_fallback_report(transcript: list[TranscriptTurn]) -> ReportResponse:
         evidence.append(
             ReportEvidence(
                 quote=user_turns[0].text,
-                insight="This question shows your opening angle and whether you anchored on behavior.",
+                insight="Bu soru açılış yaklaşımını ve davranışa dayanıp dayanmadığını gösteriyor.",
                 speaker="user",
             )
         )
@@ -417,7 +451,7 @@ def build_fallback_report(transcript: list[TranscriptTurn]) -> ReportResponse:
         evidence.append(
             ReportEvidence(
                 quote=persona_turns[0].text,
-                insight="This answer provides the main workflow context the interviewer should probe deeper.",
+                insight="Bu cevap, daha derine inilmesi gereken temel iş akışı bağlamını veriyor.",
                 speaker="simulated_persona",
             )
         )
@@ -425,7 +459,7 @@ def build_fallback_report(transcript: list[TranscriptTurn]) -> ReportResponse:
         evidence.append(
             ReportEvidence(
                 quote=user_turns[-1].text,
-                insight="Your later turns reveal whether you moved from surface pain into concrete evidence.",
+                insight="İlerleyen soruların yüzeysel problemden somut kanıta geçip geçmediğini gösteriyor.",
                 speaker="user",
             )
         )
@@ -447,9 +481,9 @@ def build_fallback_report(transcript: list[TranscriptTurn]) -> ReportResponse:
         mistakes=summarize_user_mistakes(user_turns),
         evidence=evidence,
         next_steps=[
-            "Ask for the most recent concrete example before exploring opinions.",
-            "Pressure-test pain intensity by asking what broke, slowed down, or got manually stitched together.",
-            "End with switching behavior or existing workaround questions instead of feature validation.",
+            "Fikirleri konuşmadan önce en güncel somut örneği sordugundan emin ol.",
+            "Neyin bozulduğunu, yavaşladığını veya elle birleştirildiğini sorarak acının şiddetini test et.",
+            "Özellik doğrulamak yerine mevcut çözüm, workaround ve geçiş davranışını sorarak bitir.",
         ],
     )
 
@@ -498,15 +532,16 @@ def extract_report_payload(body: object) -> dict[str, object] | None:
 def build_report_with_llm(transcript: list[TranscriptTurn]) -> ReportResponse:
     fallback_report = build_fallback_report(transcript)
     prompt = (
-        "Analyze this Mom Test style interview transcript and return only valid JSON with these keys: "
-        "overall_score, category_scores, strengths, mistakes, evidence, next_steps. "
-        "category_scores must include question_quality, bias_leading_risk, "
+        "Asagidaki Mom Test tarzi gorusme transkriptini analiz et ve sadece gecerli JSON dondur. "
+        "JSON su anahtarlari icermeli: overall_score, category_scores, strengths, mistakes, evidence, next_steps. "
+        "category_scores su alanlari icermeli: question_quality, bias_leading_risk, "
         "hypothetical_vs_real_behavior_ratio, depth_of_follow_up, evidence_seeking_quality, "
-        "learning_extraction_quality. evidence must be an array of objects with quote, insight, speaker. "
-        "overall_score and every category score must be integers between 0 and 100. "
-        "strengths, mistakes, and next_steps must each contain exactly 3 concise strings. "
-        "Use only speakers 'user' and 'simulated_persona'.\n\n"
-        "Transcript:\n"
+        "learning_extraction_quality. evidence alani quote, insight, speaker iceren objeler dizisi olmali. "
+        "overall_score ve tum kategori puanlari 0 ile 100 arasinda tam sayi olmali. "
+        "strengths, mistakes ve next_steps alanlarinin her biri tam olarak 3 kisa string icermeli. "
+        "speaker alaninda sadece 'user' ve 'simulated_persona' kullan. "
+        "JSON icindeki tum dogal dil alanlarini Turkce yaz; strengths, mistakes, evidence.insight ve next_steps kesinlikle Turkce olsun.\n\n"
+        "Transkript:\n"
         f"{format_transcript_for_prompt(transcript)}"
     )
     payload = {"input": prompt}

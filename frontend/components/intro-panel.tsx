@@ -26,7 +26,7 @@ type IntroPanelProps = {
 const scenarioOptions: ScenarioOption[] = [
   {
     id: "motivasyon",
-    title: "Mahir / Hacettepe Universitesi",
+    title: "Nehir/ Hacettepe Universitesi",
     kicker: "Senaryo 1",
     summary: "Yuzeyde AI planlama ister gibi gorunen ama aslen disiplin ve aliskanlik problemi yasayan ogrenci.",
     role: "Sen, AI ile calisma planlama app'ini anlatan ama asil problemi kesfetmeye calisan oyuncusun.",
@@ -34,7 +34,7 @@ const scenarioOptions: ScenarioOption[] = [
   },
   {
     id: "fake_interest",
-    title: "Huseyin / Ankara Ataturk Lisesi",
+    title: "Ayşe / Ankara Ataturk Lisesi",
     kicker: "Senaryo 2",
     summary: "Mantikli sekilde olumlu gorunen ama gercekte yeni tool'a gecmeye vakti olmayan tip ogrencisi.",
     role: "Sen, ilgiyi gercek talep sanmadan once mevcut sistemi ve switching cost'u sorgulayan oyuncusun.",
@@ -42,7 +42,7 @@ const scenarioOptions: ScenarioOption[] = [
   },
   {
     id: "hard_mode",
-    title: "Ulas / Bozyazi Anadolu",
+    title: "Aslı / Bozyazi Anadolu Lisesi",
     kicker: "Senaryo 3",
     summary: "Verimli olmaya takilmis ama derindeki sorunu kendi de netlestiremeyen final senesi ogrenci.",
     role: "Sen, belirsiz verimlilik sikayetinin altindaki mental load ve karar yorgunlugunu bulmaya calisan oyuncusun.",

@@ -263,7 +263,7 @@ export class RealtimeSessionController {
 
       const arrayBuffer =
         event.data instanceof ArrayBuffer ? event.data : await (event.data as Blob).arrayBuffer();
-      this.handleBinaryMessage(arrayBuffer);
+      await this.handleBinaryMessage(arrayBuffer);
     };
 
     socket.onerror = () => {
@@ -309,6 +309,44 @@ export class RealtimeSessionController {
     this.websocket = socket;
   }
 
+  private async markStreamReady(nextMode: InterviewMode = "mic-active") {
+    this.reconnectAttempts = 0;
+    this.streamReady = true;
+
+    if (!this.microphoneStarted) {
+      try {
+        await this.startMicrophone();
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Mikrofon baslatilamadi.";
+
+        if (this.readyRejector) {
+          this.readyRejector(new Error(message));
+          this.readyRejector = null;
+        } else {
+          this.callbacks.onError(message);
+        }
+        void this.dispose();
+        return false;
+      }
+    }
+
+    if (this.readyTimeoutId) {
+      window.clearTimeout(this.readyTimeoutId);
+      this.readyTimeoutId = null;
+    }
+
+    this.callbacks.onModeChange(nextMode);
+
+    if (this.readyResolver) {
+      this.readyResolver();
+      this.readyResolver = null;
+      this.readyRejector = null;
+    }
+
+    return true;
+  }
+
   private async handleJsonMessage(raw: string) {
     let payload: JsonMessage;
 
@@ -320,35 +358,14 @@ export class RealtimeSessionController {
 
     const messageType = payload.type ?? payload.event ?? "";
 
-    if (messageType === "task_stream_ready" || messageType === "session.opened") {
-      this.reconnectAttempts = 0;
-      this.streamReady = true;
-      if (!this.microphoneStarted) {
-        try {
-          await this.startMicrophone();
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : "Mikrofon baslatilamadi.";
-
-          if (this.readyRejector) {
-            this.readyRejector(new Error(message));
-            this.readyRejector = null;
-          } else {
-            this.callbacks.onError(message);
-          }
-          void this.dispose();
-          return;
-        }
-      }
-      if (this.readyTimeoutId) {
-        window.clearTimeout(this.readyTimeoutId);
-        this.readyTimeoutId = null;
-      }
-      this.callbacks.onModeChange("mic-active");
-      if (this.readyResolver) {
-        this.readyResolver();
-        this.readyResolver = null;
-        this.readyRejector = null;
+    if (
+      messageType === "task_stream_ready" ||
+      messageType === "session.opened" ||
+      messageType === "task_start"
+    ) {
+      const ready = await this.markStreamReady();
+      if (!ready) {
+        return;
       }
       return;
     }
@@ -428,6 +445,15 @@ export class RealtimeSessionController {
 
     const transcript = this.extractTranscriptPayload(payload);
     if (transcript) {
+      if (!this.streamReady) {
+        const ready = await this.markStreamReady(
+          transcript.speaker === "user" ? "user-speaking" : "ai-speaking"
+        );
+        if (!ready) {
+          return;
+        }
+      }
+
       const timestamp = Date.now();
       const startedAt =
         transcript.speaker === "user"
@@ -504,7 +530,14 @@ export class RealtimeSessionController {
     return null;
   }
 
-  private handleBinaryMessage(payload: ArrayBuffer) {
+  private async handleBinaryMessage(payload: ArrayBuffer) {
+    if (!this.streamReady) {
+      const ready = await this.markStreamReady("ai-speaking");
+      if (!ready) {
+        return;
+      }
+    }
+
     if (!this.audioContext) {
       return;
     }

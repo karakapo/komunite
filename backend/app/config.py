@@ -1,5 +1,10 @@
+from pathlib import Path
+
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+BACKEND_ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 
 
 class Settings(BaseSettings):
@@ -7,7 +12,7 @@ class Settings(BaseSettings):
         env_prefix="WIRO_",
         case_sensitive=False,
         extra="ignore",
-        env_file=".env",
+        env_file=BACKEND_ENV_FILE,
         env_file_encoding="utf-8",
     )
 
@@ -23,6 +28,8 @@ class Settings(BaseSettings):
     report_owner_slug: str = "Qwen"
     report_model_slug: str = "Qwen3.6-27B"
     voice_profile: str = "marin"
+    elevenlabs_voice_id: str | None = None
+    elevenlabs_tts_model_id: str | None = None
     input_audio_format: str = "audio/pcm"
     output_audio_format: str = "audio/pcm"
     input_audio_rate: str = "24000"

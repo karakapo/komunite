@@ -141,3 +141,104 @@ def test_realtime_token_uses_wiro_bootstrap(monkeypatch) -> None:
     assert payload["websocket_url"] == "wss://socket.wiro.ai/v1"
     assert payload["persona_name"] == "Zeynep"
     assert payload["opening_line"]
+
+
+def test_realtime_token_surfaces_non_list_wiro_errors(monkeypatch) -> None:
+    services.session_store._sessions.clear()
+    session_response = client.post(
+        "/sessions",
+        json={
+            "task": "ai-study-planner-validation",
+            "scenario": "fake_interest",
+            "locale": "en-US",
+        },
+    )
+    session_id = session_response.json()["id"]
+
+    class DummyResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {
+                "result": False,
+                "errors": {"message": "invalid payload"},
+            }
+
+    monkeypatch.setattr(services.httpx, "post", lambda *args, **kwargs: DummyResponse())
+
+    realtime = client.post(f"/sessions/{session_id}/realtime-token")
+
+    assert realtime.status_code == 502
+    assert "invalid payload" in realtime.json()["detail"]
+
+
+def test_realtime_token_uses_voice_id_for_elevenlabs(monkeypatch) -> None:
+    services.session_store._sessions.clear()
+    session_response = client.post(
+        "/sessions",
+        json={
+            "task": "ai-study-planner-validation",
+            "scenario": "fake_interest",
+            "locale": "en-US",
+        },
+    )
+    session_id = session_response.json()["id"]
+    captured: dict[str, object] = {}
+    original_owner = services.settings.realtime_owner_slug
+    original_voice_id = services.settings.elevenlabs_voice_id
+    original_tts_model_id = services.settings.elevenlabs_tts_model_id
+    original_input_audio_format = services.settings.input_audio_format
+    original_input_audio_rate = services.settings.input_audio_rate
+    original_output_audio_format = services.settings.output_audio_format
+    original_output_audio_rate = services.settings.output_audio_rate
+
+    class DummyResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {
+                "result": True,
+                "taskid": "task-123",
+                "socketaccesstoken": "socket-token-abc",
+            }
+
+    def fake_post(url: str, json: dict[str, object], headers: dict[str, str], timeout: float) -> DummyResponse:
+        captured["url"] = url
+        captured["json"] = json
+        return DummyResponse()
+
+    services.settings.realtime_owner_slug = "elevenlabs"
+    services.settings.elevenlabs_voice_id = "21m00Tcm4TlvDq8ikWAM"
+    services.settings.elevenlabs_tts_model_id = "eleven_multilingual_v2"
+    services.settings.input_audio_format = "audio/pcm"
+    services.settings.input_audio_rate = "24000"
+    services.settings.output_audio_format = "audio/pcm"
+    services.settings.output_audio_rate = "24000"
+    monkeypatch.setattr(services.httpx, "post", fake_post)
+
+    try:
+        realtime = client.post(f"/sessions/{session_id}/realtime-token")
+    finally:
+        services.settings.realtime_owner_slug = original_owner
+        services.settings.elevenlabs_voice_id = original_voice_id
+        services.settings.elevenlabs_tts_model_id = original_tts_model_id
+        services.settings.input_audio_format = original_input_audio_format
+        services.settings.input_audio_rate = original_input_audio_rate
+        services.settings.output_audio_format = original_output_audio_format
+        services.settings.output_audio_rate = original_output_audio_rate
+
+    assert realtime.status_code == 200
+    assert "json" in captured
+    assert captured["json"]["voice_id"] == "21m00Tcm4TlvDq8ikWAM"
+    assert captured["json"]["tts_model_id"] == "eleven_multilingual_v2"
+    assert captured["json"]["language"] == "en"
+    assert captured["json"]["first_message"] == "Merhaba, başlayabiliriz."
+    assert "voice" not in captured["json"]
+    assert "system_instructions" in captured["json"]
+    assert captured["json"]["system_instructions"]
+    assert "input_audio_format" not in captured["json"]
+    assert "output_audio_format" not in captured["json"]
+    assert "input_audio_rate" not in captured["json"]
+    assert "output_audio_rate" not in captured["json"]
