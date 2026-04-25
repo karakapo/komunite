@@ -28,7 +28,7 @@ const scenarioOptions: ScenarioOption[] = [
     id: "motivasyon",
     title: "Nehir/ Hacettepe Universitesi",
     kicker: "Senaryo 1",
-    summary: "Yuzeyde AI planlama ister gibi gorunen ama aslen disiplin ve aliskanlik problemi yasayan ogrenci.",
+    summary: "20 yasinda, Hacettepe Universitesinde okuyor. Yogun ders programi var ve duzenli calisma rutini kurmakta zorlaniyor.",
     role: "Sen, AI ile calisma planlama app'ini anlatan ama asil problemi kesfetmeye calisan oyuncusun.",
     focus: "Tool ihtiyaci gibi duran istegin altinda plan yapip birakma ve dikkat daginikligi olup olmadigini ortaya cikar."
   },
@@ -36,7 +36,7 @@ const scenarioOptions: ScenarioOption[] = [
     id: "fake_interest",
     title: "Ayşe / Ankara Ataturk Lisesi",
     kicker: "Senaryo 2",
-    summary: "Mantikli sekilde olumlu gorunen ama gercekte yeni tool'a gecmeye vakti olmayan tip ogrencisi.",
+    summary: "17 yasinda, Ankara Ataturk Lisesinde okuyor. Sinav senesinde ve mevcut not duzenini bozmak istemiyor.",
     role: "Sen, ilgiyi gercek talep sanmadan once mevcut sistemi ve switching cost'u sorgulayan oyuncusun.",
     focus: "Asil problemin planlama degil zaman baskisi ve yeni bir sistem ogrenme maliyeti oldugunu cikar."
   },
@@ -44,7 +44,7 @@ const scenarioOptions: ScenarioOption[] = [
     id: "hard_mode",
     title: "Aslı / Bozyazi Anadolu Lisesi",
     kicker: "Senaryo 3",
-    summary: "Verimli olmaya takilmis ama derindeki sorunu kendi de netlestiremeyen final senesi ogrenci.",
+    summary: "18 yasinda, Bozyazi Anadolu Lisesinde son sinif ogrencisi. Okul, deneme ve odev temposu arasinda sikismis hissediyor.",
     role: "Sen, belirsiz verimlilik sikayetinin altindaki mental load ve karar yorgunlugunu bulmaya calisan oyuncusun.",
     focus: "Gunluk akisi, son verimli gunu ve onu durduran seyleri deserek gercek sikismayi ortaya cikar."
   }
@@ -58,8 +58,15 @@ const appOption = {
   role:
     "Sen, bu urunun gercekten ihtiyac olup olmadigini anlamaya calisan oyuncusun.",
   focus:
-    "Amac urunu satmak degil; kullanicinin gercekten tool problemi mi, yoksa daha derin bir problem mi yasadigini bulmak."
+    "Amac urunu satmak degil; kullanicinin gercekten tool problemi mi, yoksa daha derin bir problem mi yasadigini bulmak.",
+  details: [
+    "Ders ve hedef bazli kisisel calisma plani olusturur.",
+    "Gunluk takip, hatirlatma ve tekrar rutini kurmaya yardim eder.",
+    "Verimlilik, odak ve ilerleme hissini artirma sozu verir."
+  ]
 };
+
+const lockedPlaceholders = Array.from({ length: 2 }, (_, index) => index);
 
 export function IntroPanel({
   scenario,
@@ -82,23 +89,19 @@ export function IntroPanel({
 
       <div className="stepper-row" aria-label="Akis adimlari">
         <div
-          className={`step-pill ${flowStep === "select" ? "is-active" : "is-complete"}`}
-        >
-          1. Hikaye sec
-        </div>
-        <div className={`step-pill ${flowStep === "details" ? "is-active" : ""}`}>
-          2. Hikaye detaylari
-        </div>
-        <div className="step-pill is-muted">3. Oyuna basla</div>
+          className={`step-dot ${flowStep === "select" ? "is-active" : "is-complete"}`}
+          aria-label="1. Hikaye sec"
+        />
+        <div
+          className={`step-dot ${flowStep === "details" ? "is-active" : ""}`}
+          aria-label="2. Hikaye detaylari"
+        />
+        <div className="step-dot is-muted" aria-label="3. Oyuna basla" />
       </div>
 
       {flowStep === "select" ? (
         <>
           <h1 className="hero-title">Ilk olarak hikayeni sec.</h1>
-          <p className="hero-copy">
-            Bu oyunda tek bir urun var: AI destekli study tool. Ilk adimda urunu
-            seciyorsun, ikinci adimda ise hangi tip kullaniciyla konusacagini belirliyorsun.
-          </p>
 
           <div className="scenario-strip">
             <button
@@ -111,6 +114,11 @@ export function IntroPanel({
               <p className="scenario-chip-copy">{appOption.summary}</p>
               <small className="scenario-chip-badge">Tek urun</small>
             </button>
+            {lockedPlaceholders.map((item) => (
+              <div key={item} className="scenario-chip is-locked locked-placeholder">
+                <span className="locked-placeholder-icon">􀎠</span>
+              </div>
+            ))}
           </div>
 
           <div className="cta-row">
@@ -130,10 +138,6 @@ export function IntroPanel({
             Urun sabit, ama gorusmenin akisi degisiyor. Asagida istedigin
             gorusmeyi secip oyunu baslat.
           </p>
-
-          <div className="mic-notice">
-            Oyun sesli baslar. Tarayici mikrofon izni isteyecek ve karakter ilk cumleyi sesli soyleyecek.
-          </div>
 
           <div className="scenario-strip">
             {scenarioOptions.map((item) => {
@@ -158,20 +162,19 @@ export function IntroPanel({
 
           <div className="scenario-detail">
             <div className="scenario-detail-card role-card">
-              <span>Senin rolun</span>
-              <strong>{appOption.role}</strong>
+              <span>Uygulama ne sunuyor</span>
+              <strong>{appOption.summary}</strong>
+              <ul className="detail-list">
+                {appOption.details.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
             </div>
 
             <div className="scenario-detail-card">
-              <span>Hikaye odagi</span>
+              <span>Neyi test ediyorsun</span>
+              <strong>{appOption.role}</strong>
               <p>{appOption.focus}</p>
-            </div>
-          </div>
-
-          <div className="detail-summary-grid">
-            <div className="scenario-detail-card compact">
-              <span>Gorsel durum</span>
-              <strong>{visualsLoading ? "Hazirlaniyor" : "Hazir"}</strong>
             </div>
           </div>
 

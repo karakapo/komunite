@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import { InterviewMode } from "../lib/realtime-session";
 import {
   LiveTranscriptPartial,
@@ -38,32 +37,19 @@ const scenarioLabels: Record<SessionResponse["scenario"], string> = {
 
 export function LiveInterview({
   session,
-  visuals,
+  visuals: _visuals,
   transcript,
   livePartial,
   interviewMode,
   onEndCall,
   report
 }: LiveInterviewProps) {
-  const readyVisuals = useMemo(
-    () => visuals.filter((visual) => visual.status === "ready" && visual.image_url),
-    [visuals]
-  );
-  const [activePose, setActivePose] = useState(0);
-
-  useEffect(() => {
-    if (readyVisuals.length === 0 || interviewMode !== "ai-speaking") {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      setActivePose((current) => (current + 1) % readyVisuals.length);
-    }, 1150);
-
-    return () => window.clearInterval(interval);
-  }, [interviewMode, readyVisuals.length]);
-
-  const currentVisual = readyVisuals[activePose] ?? null;
+  const avatarSrc =
+    interviewMode === "ai-speaking" ? "/avatar-talking.png" : "/avatar-idle.png";
+  const avatarAlt =
+    interviewMode === "ai-speaking"
+      ? `${session.persona_name} konusuyor`
+      : `${session.persona_name} dinliyor`;
 
   return (
     <section className="live-grid">
@@ -87,17 +73,13 @@ export function LiveInterview({
         </div>
 
         <div className="avatar-stage">
-          {currentVisual ? (
-            <img
-              alt={`Avatar poz ${currentVisual.pose_index + 1}`}
-              className={`avatar-image ${
-                interviewMode === "ai-speaking" ? "is-speaking" : "is-listening"
-              }`}
-              src={currentVisual.image_url ?? undefined}
-            />
-          ) : (
-            <div className="avatar-placeholder">Avatar pozlari hazirlaniyor...</div>
-          )}
+          <img
+            alt={avatarAlt}
+            className={`avatar-image ${
+              interviewMode === "ai-speaking" ? "is-speaking" : "is-listening"
+            }`}
+            src={avatarSrc}
+          />
 
           <div className="avatar-overlay-card">
             <span>Acilis cumlesi</span>
