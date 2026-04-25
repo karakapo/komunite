@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     output_audio_format: str = "audio/pcm"
     input_audio_rate: str = "24000"
     output_audio_rate: str = "24000"
+    transcription_model: str = "gpt-4o-transcribe"
+    turn_detection_threshold: str = "0.5"
+    turn_detection_silence_ms: str = "500"
     realtime_payload_json: str | None = None
 
 

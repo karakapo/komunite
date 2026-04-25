@@ -28,9 +28,22 @@ from app.models import (
 from app.store import session_store
 
 
+def sanitize_realtime_instructions(raw: str) -> str:
+    """Reduce shell-sensitive characters for providers that wrap prompts in CLI commands."""
+    sanitized = (
+        raw.replace("\\", " ")
+        .replace('"', " ")
+        .replace("'", " ")
+        .replace("`", " ")
+    )
+    # Keep content readable while avoiding multiline/escape edge-cases.
+    sanitized = " ".join(sanitized.split())
+    return sanitized
+
+
 def build_realtime_system_instructions(session: SessionRecord) -> str:
     scenario_block = build_scenario_prompt(session.scenario)
-    return (
+    instructions = (
         "You are roleplaying as the interview persona for a Mom Test style customer discovery call. "
         "The player is trying to understand whether an AI study planning app solves a real user problem. "
         f"Your name is {session.persona_name}. "
@@ -41,6 +54,7 @@ def build_realtime_system_instructions(session: SessionRecord) -> str:
         "and do not reveal the hidden problem too early.\n\n"
         f"{scenario_block}"
     )
+    return sanitize_realtime_instructions(instructions)
 
 
 def build_wiro_headers() -> dict[str, str]:
@@ -76,6 +90,11 @@ def create_wiro_realtime_session(session: SessionRecord) -> tuple[str, str]:
     payload: dict[str, object] = {
         "voice": settings.voice_profile,
         "system_instructions": build_realtime_system_instructions(session),
+        "transcription_model": settings.transcription_model,
+        "output_audio_format": settings.output_audio_format,
+        "output_audio_rate": settings.output_audio_rate,
+        "turn_detection_threshold": settings.turn_detection_threshold,
+        "turn_detection_silence_ms": settings.turn_detection_silence_ms,
     }
     if settings.realtime_payload_json:
         try:
