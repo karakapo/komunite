@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     realtime_model_slug: str = "gpt-realtime"
     report_owner_slug: str = "Qwen"
     report_model_slug: str = "Qwen3.6-27B"
-    voice_profile: str = "marin"
+    voice_profile: str = "cedar"
     input_audio_format: str = "audio/pcm"
     output_audio_format: str = "audio/pcm"
     input_audio_rate: str = "24000"

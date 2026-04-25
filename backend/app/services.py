@@ -173,10 +173,16 @@ def build_scenario_prompt(scenario: Scenario) -> str:
         "- Speak in Turkish.\n"
         "- Sound like a real student, not an evaluator.\n"
         "- Do not dump your full backstory in one answer.\n"
-        "- At first, stay somewhat surface level and show mild interest in the product idea.\n"
-        "- Reveal the deeper problem only if the interviewer asks strong behavioral follow-up questions.\n"
-        "- Never explicitly say 'my real problem is ...'.\n"
-        "- The hidden goal is to test whether the interviewer can distinguish a tool request from the real underlying problem.\n\n"
+        "- Stay concise, conversational, and cooperative.\n"
+        "- Show clear product interest from early turns and be open to guidance.\n"
+        "- When interviewer frames value, react positively and discuss how you would try the app.\n"
+        "- If asked about adoption, answer with realistic onboarding expectations instead of hard resistance.\n"
+        "- Share real friction points, but do not block the flow with over-defensive answers.\n\n"
+        "Backstory reveal policy:\n"
+        "- Keep answers surface-level unless interviewer asks concrete past-behavior questions.\n"
+        "- Reveal personal context gradually in small pieces, not all at once.\n"
+        "- Prefer specific examples (last exam week, last failed plan, last distraction loop) over abstract explanation.\n"
+        "- If questions stay generic, remain generic and brief.\n\n"
     )
 
     if scenario == "motivasyon":
@@ -192,6 +198,7 @@ def build_scenario_prompt(scenario: Scenario) -> str:
             "Behavior:\n"
             "- You are positive and easygoing.\n"
             "- You can quickly say a product sounds useful.\n"
+            "- You respond well when the interviewer leads the conversation.\n"
             "- You may say things like 'boyle AI bir sey olsa iyi olur'.\n"
             "Hidden truth:\n"
             "- The real problem is not missing tools.\n"
@@ -200,6 +207,11 @@ def build_scenario_prompt(scenario: Scenario) -> str:
             "- You make plans but stop following them.\n"
             "- You fall back into distraction and inconsistency.\n"
             "- Your current issue is execution, not planning quality.\n"
+            "Backstory seeds (reveal only with good follow-up):\n"
+            "- Last two vize haftasi, plan yaptin ama ucuncu gunden sonra YouTube shorts ve Instagram'a kaydin.\n"
+            "- Gecen donem bir dersten butunlemeye kaldin; konu eksiginden cok duzensiz calisma etkiledi.\n"
+            "- Iki farkli study app'i denedin, ilk hafta kullandin, sonra bildirimleri kapatip biraktin.\n"
+            "- Kutuphane yerine yurtta calisirken dikkatin daha hizli dagiliyor.\n"
         )
     if scenario == "fake_interest":
         return (
@@ -215,6 +227,7 @@ def build_scenario_prompt(scenario: Scenario) -> str:
             "- You sound logical and organized.\n"
             "- You can make the interviewer feel they are on the right track.\n"
             "- You may say AI planning sounds good in principle.\n"
+            "- You are open to guided adoption if the value is explained clearly.\n"
             "Hidden truth:\n"
             "- The real problem is not planning quality.\n"
             "- The real problem is overload, lack of time, and switching cost.\n"
@@ -223,6 +236,10 @@ def build_scenario_prompt(scenario: Scenario) -> str:
             "- Your current system already works well enough.\n"
             "- Changing systems feels expensive mentally and practically.\n"
             "- Even a good tool may fail because onboarding friction is too high.\n"
+            "Backstory seeds (reveal only with good follow-up):\n"
+            "- Notion + takvim + kisa to-do sistemiyle gidiyorsun; yeni araca gecmek zaman maliyeti yaratiyor.\n"
+            "- Klinik/yoğun ders gunlerinde yeni akisa adapte olmak zor geliyor.\n"
+            "- Yeni bir arac denediginde 3-4 gun sonra eski duzene dondugun oldu.\n"
         )
     return (
         common_rules
@@ -237,6 +254,7 @@ def build_scenario_prompt(scenario: Scenario) -> str:
         "- You describe problems, but the solution is unclear even to you.\n"
         "- You can sound self-aware but also scattered.\n"
         "- You may say things like 'daha verimli olmam lazim'.\n"
+        "- You become more optimistic when interviewer proposes practical steps.\n"
         "Hidden truth:\n"
         "- The real problem is not a missing study tool.\n"
         "- The real problem is mental load, decision fatigue, and overthinking.\n"
@@ -245,6 +263,10 @@ def build_scenario_prompt(scenario: Scenario) -> str:
         "- Your days feel fragmented and mentally heavy.\n"
         "- You are stuck between many priorities.\n"
         "- The block is execution paralysis more than planning.\n"
+        "Backstory seeds (reveal only with good follow-up):\n"
+        "- Sabah staj/okul, aksam is basvurusu ve mulakat hazirligi arasinda calisma bloklari bolunuyor.\n"
+        "- Productivity icerigi tukettikce beklentin artiyor ama baslama bariyeri de buyuyor.\n"
+        "- Haftalik plan yapiyorsun ama gun icinde 'once su isi bitireyim' derken plan kayiyor.\n"
     )
 
 
@@ -376,11 +398,11 @@ def fetch_wiro_realtime_task_debug(task_id: str) -> RealtimeTaskDebugResponse:
 
 def summarize_user_strengths(user_turns: list[TranscriptTurn]) -> list[str]:
     if not user_turns:
-        return ["You completed the session, but no user transcript turns were captured."]
+        return ["Oturumu tamamladin, ancak kullaniciya ait transcript satiri yakalanmadi."]
     return [
-        "You asked at least one concrete follow-up about a recent workflow.",
-        "You kept the conversation focused on behavior instead of pure opinions.",
-        "You gave the simulated user room to describe operational friction in detail.",
+        "En az bir kez, yakin zamandaki gercek akis uzerinden somut follow-up sordun.",
+        "Gorusmeyi yalnizca fikirlere degil, davranis ve gecmis deneyimlere odakli tuttun.",
+        "Simule kullaniciya operasyonel zorluklarini detaylandirmasi icin alan actin.",
     ]
 
 
@@ -388,14 +410,14 @@ def summarize_user_mistakes(user_turns: list[TranscriptTurn]) -> list[str]:
     joined = " ".join(turn.text.lower() for turn in user_turns)
     mistakes: list[str] = []
     if "would" in joined or "will" in joined:
-        mistakes.append("Some questions drifted toward hypothetical future behavior.")
+        mistakes.append("Bazi sorular varsayimsal gelecek davranisina kaydi.")
     if not any("last" in turn.text.lower() or "recent" in turn.text.lower() for turn in user_turns):
-        mistakes.append("You did not anchor enough questions in a specific past event.")
+        mistakes.append("Sorularini yeterince belirli bir gecmis olaya dayandirmadin.")
     if not any("why" in turn.text.lower() or "what happened" in turn.text.lower() for turn in user_turns):
-        mistakes.append("Your follow-ups could go deeper on causes and decision points.")
+        mistakes.append("Follow-up sorularinda nedenlere ve karar anlarina daha derin inebilirdin.")
     if not mistakes:
         mistakes.append(
-            "The session was strong overall; next gains will come from sharper evidence-seeking probes."
+            "Gorusme genel olarak gucluydu; bir sonraki gelisim alanin daha keskin kanit odakli sorular."
         )
     return mistakes
 
@@ -409,7 +431,7 @@ def build_fallback_report(transcript: list[TranscriptTurn]) -> ReportResponse:
         evidence.append(
             ReportEvidence(
                 quote=user_turns[0].text,
-                insight="This question shows your opening angle and whether you anchored on behavior.",
+                insight="Bu soru, acilis acini ve davranis odagini ne kadar iyi kurdugunu gosteriyor.",
                 speaker="user",
             )
         )
@@ -417,7 +439,7 @@ def build_fallback_report(transcript: list[TranscriptTurn]) -> ReportResponse:
         evidence.append(
             ReportEvidence(
                 quote=persona_turns[0].text,
-                insight="This answer provides the main workflow context the interviewer should probe deeper.",
+                insight="Bu yanit, derinlesilmesi gereken temel kullanim akisina dair ilk baglami veriyor.",
                 speaker="simulated_persona",
             )
         )
@@ -425,7 +447,7 @@ def build_fallback_report(transcript: list[TranscriptTurn]) -> ReportResponse:
         evidence.append(
             ReportEvidence(
                 quote=user_turns[-1].text,
-                insight="Your later turns reveal whether you moved from surface pain into concrete evidence.",
+                insight="Son turlardaki sorularin, yuzeysel problemlerden somut kanita gecip gecmedigini gosteriyor.",
                 speaker="user",
             )
         )
@@ -447,16 +469,16 @@ def build_fallback_report(transcript: list[TranscriptTurn]) -> ReportResponse:
         mistakes=summarize_user_mistakes(user_turns),
         evidence=evidence,
         next_steps=[
-            "Ask for the most recent concrete example before exploring opinions.",
-            "Pressure-test pain intensity by asking what broke, slowed down, or got manually stitched together.",
-            "End with switching behavior or existing workaround questions instead of feature validation.",
+            "Fikirleri tartismadan once en son yasanmis somut ornegi sor.",
+            "Acinin siddetini anlamak icin neyin bozuldugunu, yavasladigini veya manuel toparlandigini sorgula.",
+            "Ozellik onayi yerine, mevcut cozum ve degisim davranisi sorulariyla kapatis yap.",
         ],
     )
 
 
 def format_transcript_for_prompt(transcript: list[TranscriptTurn]) -> str:
     if not transcript:
-        return "No transcript was captured."
+        return "Transcript yakalanmadi."
 
     return "\n".join(
         f"{index + 1}. {turn.speaker}: {turn.text}"
@@ -498,14 +520,16 @@ def extract_report_payload(body: object) -> dict[str, object] | None:
 def build_report_with_llm(transcript: list[TranscriptTurn]) -> ReportResponse:
     fallback_report = build_fallback_report(transcript)
     prompt = (
-        "Analyze this Mom Test style interview transcript and return only valid JSON with these keys: "
+        "Asagidaki Mom Test tarzindaki mulakat transcriptini analiz et ve yalnizca gecerli JSON don. "
+        "Yanit dili Turkce olsun. JSON anahtarlari su sekilde olmali: "
         "overall_score, category_scores, strengths, mistakes, evidence, next_steps. "
-        "category_scores must include question_quality, bias_leading_risk, "
+        "category_scores sunlari icermeli: question_quality, bias_leading_risk, "
         "hypothetical_vs_real_behavior_ratio, depth_of_follow_up, evidence_seeking_quality, "
-        "learning_extraction_quality. evidence must be an array of objects with quote, insight, speaker. "
-        "overall_score and every category score must be integers between 0 and 100. "
-        "strengths, mistakes, and next_steps must each contain exactly 3 concise strings. "
-        "Use only speakers 'user' and 'simulated_persona'.\n\n"
+        "learning_extraction_quality. evidence, quote, insight, speaker alanlarini iceren nesne dizisi olmali. "
+        "overall_score ve tum kategori skorlarini 0-100 arasinda tamsayi ver. "
+        "strengths, mistakes ve next_steps alanlarinda tam olarak 3 kisa Turkce madde olsun. "
+        "mistakes maddelerinde yapici sekilde 'gelistirebilirdin' tonunu koru. "
+        "speaker yalnizca 'user' ve 'simulated_persona' olabilir.\n\n"
         "Transcript:\n"
         f"{format_transcript_for_prompt(transcript)}"
     )
