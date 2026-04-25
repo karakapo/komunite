@@ -1,0 +1,13 @@
+.DS_Store
+node_modules
+.next
+dist
+build
+.venv
+__pycache__
+.pytest_cache
+.mypy_cache
+*.pyc
+backend/.session_data
+frontend/.env.local
+backend/.env

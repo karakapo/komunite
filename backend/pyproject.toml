@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mom-test-wiro-backend"
+version = "0.1.0"
+description = "FastAPI orchestration layer for the Mom Test Wiro realtime platform"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.115.12",
+  "uvicorn[standard]==0.34.2",
+  "pydantic==2.11.3"
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx==0.28.1",
+  "pytest==8.3.5"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
