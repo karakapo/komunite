@@ -33,6 +33,10 @@ class SessionStore:
         with self._lock:
             self._sessions[session_id].transcript = transcript
 
+    def set_realtime_task_id(self, session_id: str, task_id: str) -> None:
+        with self._lock:
+            self._sessions[session_id].realtime_task_id = task_id
+
     def set_report(self, session_id: str, report: ReportResponse) -> None:
         with self._lock:
             self._sessions[session_id].report = report

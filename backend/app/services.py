@@ -14,6 +14,7 @@ from fastapi import HTTPException
 
 from app.config import settings
 from app.models import (
+    RealtimeTaskDebugResponse,
     ReportEvidence,
     ReportResponse,
     RealtimeTokenResponse,
@@ -72,14 +73,24 @@ def build_wiro_headers() -> dict[str, str]:
 
 
 def create_wiro_realtime_session(session: SessionRecord) -> tuple[str, str]:
-    payload = {
+    payload: dict[str, object] = {
         "voice": settings.voice_profile,
         "system_instructions": build_realtime_system_instructions(session),
-        "input_audio_format": settings.input_audio_format,
-        "output_audio_format": settings.output_audio_format,
-        "input_audio_rate": settings.input_audio_rate,
-        "output_audio_rate": settings.output_audio_rate,
     }
+    if settings.realtime_payload_json:
+        try:
+            override_payload = json.loads(settings.realtime_payload_json)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="WIRO_REALTIME_PAYLOAD_JSON is not valid JSON",
+            ) from exc
+        if not isinstance(override_payload, dict):
+            raise HTTPException(
+                status_code=503,
+                detail="WIRO_REALTIME_PAYLOAD_JSON must decode to a JSON object",
+            )
+        payload = override_payload
     url = (
         f"{settings.api_base_url}/Run/"
         f"{settings.realtime_owner_slug}/{settings.realtime_model_slug}"
@@ -293,6 +304,7 @@ def create_session_record(payload: SessionCreateRequest) -> SessionRecord:
 def build_realtime_bootstrap(session_id: str) -> RealtimeTokenResponse:
     session = session_store.get(session_id)
     task_id, token = create_wiro_realtime_session(session)
+    session_store.set_realtime_task_id(session_id, task_id)
     session_store.add_event(
         session_id,
         make_event("realtime.bootstrap", f"Issued Wiro realtime bootstrap token for task {task_id}"),
@@ -304,6 +316,42 @@ def build_realtime_bootstrap(session_id: str) -> RealtimeTokenResponse:
         websocket_url=settings.realtime_websocket_url,
         ephemeral_token=token,
         voice_profile=settings.voice_profile,
+        persona_name=session.persona_name,
+        opening_line=session.opening_line,
+    )
+
+
+def fetch_wiro_realtime_task_debug(task_id: str) -> RealtimeTaskDebugResponse:
+    url = f"{settings.api_base_url}/Task/Detail"
+
+    try:
+        response = httpx.post(
+            url,
+            json={"taskid": task_id},
+            headers=build_wiro_headers(),
+            timeout=15.0,
+        )
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.text or "Wiro Task/Detail request failed"
+        raise HTTPException(status_code=502, detail=f"Wiro Task/Detail error: {detail}") from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Unable to reach Wiro Task/Detail") from exc
+
+    body = response.json()
+    tasklist = body.get("tasklist")
+    task_detail = tasklist[0] if isinstance(tasklist, list) and tasklist else body
+
+    errors = task_detail.get("errors") or body.get("errors") or []
+    if not isinstance(errors, list):
+        errors = [str(errors)]
+
+    return RealtimeTaskDebugResponse(
+        task_id=str(task_id),
+        status=task_detail.get("status"),
+        pexit=str(task_detail.get("pexit")) if task_detail.get("pexit") is not None else None,
+        debugoutput=task_detail.get("debugoutput"),
+        errors=[str(item) for item in errors],
     )
 
 

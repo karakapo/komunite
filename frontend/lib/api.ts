@@ -1,5 +1,6 @@
 import {
   ReportResponse,
+  RealtimeTaskDebugResponse,
   RealtimeTokenResponse,
   Scenario,
   SessionEvent,
@@ -46,6 +47,12 @@ export async function fetchRealtimeToken(
   return request<RealtimeTokenResponse>(`/sessions/${sessionId}/realtime-token`, {
     method: "POST"
   });
+}
+
+export async function fetchRealtimeDebug(
+  sessionId: string
+): Promise<RealtimeTaskDebugResponse> {
+  return request<RealtimeTaskDebugResponse>(`/sessions/${sessionId}/realtime-debug`);
 }
 
 export async function fetchEvents(sessionId: string): Promise<SessionEvent[]> {

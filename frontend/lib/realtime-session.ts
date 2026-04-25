@@ -32,15 +32,33 @@ type JsonMessage = {
   event?: string;
   pexit?: string;
   error?: string;
+  errors?: string[];
+  debugoutput?: string;
 };
 
 const AUDIO_SAMPLE_RATE = 24_000;
 const CHUNK_SAMPLES = 4_800;
 const MAX_RECONNECT_ATTEMPTS = 2;
-const START_TIMEOUT_MS = 8_000;
+const START_TIMEOUT_MS = 20_000;
+const END_TIMEOUT_MS = 5_000;
+const INTRO_SPEECH_GRACE_MS = 250;
 
 function toIso(timestamp: number): string {
   return new Date(timestamp).toISOString();
+}
+
+function describeSocketClose(event: CloseEvent): string {
+  const details = [`code ${event.code}`];
+
+  if (event.reason) {
+    details.push(`reason: ${event.reason}`);
+  }
+
+  if (!event.wasClean) {
+    details.push("unclean close");
+  }
+
+  return details.join(", ");
 }
 
 function normalizeSpeaker(raw: string | undefined): "user" | "simulated_persona" | null {
@@ -160,11 +178,14 @@ export class RealtimeSessionController {
   private reconnectAttempts = 0;
   private streamReady = false;
   private ended = false;
+  private endRequested = false;
   private readyResolver: (() => void) | null = null;
   private readyRejector: ((reason?: unknown) => void) | null = null;
   private readyTimeoutId: number | null = null;
+  private shutdownTimeoutId: number | null = null;
   private currentUserTurnStartedAt: number | null = null;
   private currentAiTurnStartedAt: number | null = null;
+  private introSpoken = false;
 
   constructor(bootstrap: RealtimeTokenResponse, callbacks: RealtimeCallbacks) {
     this.bootstrap = bootstrap;
@@ -172,6 +193,14 @@ export class RealtimeSessionController {
   }
 
   async start(): Promise<void> {
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices ||
+      typeof navigator.mediaDevices.getUserMedia !== "function"
+    ) {
+      throw new Error("Bu tarayici mikrofon erisimini desteklemiyor.");
+    }
+
     this.callbacks.onModeChange("realtime-connecting");
     this.audioContext = new AudioContext({
       sampleRate: AUDIO_SAMPLE_RATE,
@@ -190,6 +219,7 @@ export class RealtimeSessionController {
     this.mediaSource = this.audioContext.createMediaStreamSource(this.mediaStream);
     this.processorNode = await createPcmWorklet(this.audioContext);
     this.mediaSource.connect(this.processorNode);
+    await this.audioContext.resume();
 
     this.processorNode.port.onmessage = (event: MessageEvent<Float32Array>) => {
       if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN || !this.streamReady) {
@@ -198,8 +228,7 @@ export class RealtimeSessionController {
 
       const chunk = event.data;
       const pcm = floatTo16BitPCM(chunk);
-      const payload = buildAudioFrame(this.bootstrap.ephemeral_token, pcm);
-      this.websocket.send(payload);
+      this.websocket.send(buildAudioFrame(this.bootstrap.ephemeral_token, pcm));
     };
 
     return new Promise<void>((resolve, reject) => {
@@ -219,11 +248,16 @@ export class RealtimeSessionController {
   }
 
   async end(): Promise<void> {
-    this.ended = true;
+    this.endRequested = true;
     this.streamReady = false;
     if (this.readyTimeoutId) {
       window.clearTimeout(this.readyTimeoutId);
       this.readyTimeoutId = null;
+    }
+
+    if (this.shutdownTimeoutId) {
+      window.clearTimeout(this.shutdownTimeoutId);
+      this.shutdownTimeoutId = null;
     }
 
     if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
@@ -233,11 +267,13 @@ export class RealtimeSessionController {
           tasktoken: this.bootstrap.ephemeral_token
         })
       );
+      this.shutdownTimeoutId = window.setTimeout(() => {
+        void this.dispose();
+      }, END_TIMEOUT_MS);
+      return;
     }
 
-    window.setTimeout(() => {
-      void this.dispose();
-    }, 800);
+    await this.dispose();
   }
 
   async dispose(): Promise<void> {
@@ -253,6 +289,11 @@ export class RealtimeSessionController {
         this.websocket.close();
       }
       this.websocket = null;
+    }
+
+    if (this.shutdownTimeoutId) {
+      window.clearTimeout(this.shutdownTimeoutId);
+      this.shutdownTimeoutId = null;
     }
 
     if (this.processorNode) {
@@ -277,7 +318,12 @@ export class RealtimeSessionController {
 
     this.audioContext = null;
     this.playbackCursor = 0;
+    this.introSpoken = false;
+    this.endRequested = false;
     this.callbacks.onPartialTranscript(null);
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
   }
 
   private connectSocket() {
@@ -311,22 +357,23 @@ export class RealtimeSessionController {
       }
     };
 
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       this.websocket = null;
 
-      if (this.ended) {
+      if (this.ended || this.endRequested) {
         return;
       }
 
       if (!this.streamReady && this.readyRejector) {
-        this.readyRejector(new Error("Canli ses baglantisi baslatilamadi."));
+        this.readyRejector(
+          new Error(`Canli ses baglantisi baslatilamadi (${describeSocketClose(event)}).`)
+        );
         this.readyRejector = null;
         return;
       }
 
       if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
         this.callbacks.onError("Canli baglanti koptu. Lutfen yeniden dene.");
-        this.callbacks.onModeChange("reconnecting");
         void this.dispose();
         return;
       }
@@ -335,7 +382,7 @@ export class RealtimeSessionController {
       this.streamReady = false;
       this.callbacks.onModeChange("reconnecting");
       window.setTimeout(() => {
-        if (!this.ended) {
+        if (!this.ended && !this.endRequested) {
           this.connectSocket();
         }
       }, 1000 * this.reconnectAttempts);
@@ -363,6 +410,7 @@ export class RealtimeSessionController {
         this.readyTimeoutId = null;
       }
       this.callbacks.onModeChange("mic-active");
+      this.playIntroSpeech();
       if (this.readyResolver) {
         this.readyResolver();
         this.readyResolver = null;
@@ -377,13 +425,52 @@ export class RealtimeSessionController {
       return;
     }
 
+    if (messageType === "task_error" || messageType === "task_error_full") {
+      const errorMessage =
+        payload.message ??
+        payload.text ??
+        payload.error ??
+        payload.errors?.join(", ") ??
+        payload.debugoutput ??
+        "Canli oturum sirasinda sunucu hata logu gonderdi.";
+
+      if (!this.streamReady && this.readyRejector) {
+        this.readyRejector(new Error(errorMessage));
+        this.readyRejector = null;
+        void this.dispose();
+        return;
+      }
+
+      this.callbacks.onError(errorMessage);
+      return;
+    }
+
     if (messageType === "task_end" || messageType === "session.closed") {
+      if (!this.streamReady && this.readyRejector) {
+        this.readyRejector(
+          new Error("Canli oturum beklenmeden sonlandi. Sunucu task_end gonderdi.")
+        );
+        this.readyRejector = null;
+      }
       void this.dispose();
       return;
     }
 
     if (messageType === "error" || payload.error || payload.pexit === "1") {
-      this.callbacks.onError(payload.error ?? "Canli gorusme sirasinda bir hata olustu.");
+      const errorMessage =
+        payload.error ??
+        payload.errors?.join(", ") ??
+        payload.debugoutput ??
+        "Canli gorusme sirasinda bir hata olustu.";
+
+      if (!this.streamReady && this.readyRejector) {
+        this.readyRejector(new Error(errorMessage));
+        this.readyRejector = null;
+        void this.dispose();
+        return;
+      }
+
+      this.callbacks.onError(errorMessage);
       return;
     }
 
@@ -487,5 +574,48 @@ export class RealtimeSessionController {
     source.start(startAt);
     this.playbackCursor = startAt + buffer.duration;
     this.callbacks.onModeChange("ai-speaking");
+  }
+
+  private playIntroSpeech() {
+    if (
+      this.introSpoken ||
+      typeof window === "undefined" ||
+      !("speechSynthesis" in window) ||
+      !this.bootstrap.opening_line
+    ) {
+      return;
+    }
+
+    this.introSpoken = true;
+    this.currentAiTurnStartedAt = Date.now();
+    this.callbacks.onModeChange("ai-speaking");
+
+    const utterance = new SpeechSynthesisUtterance(this.bootstrap.opening_line);
+    utterance.lang = "tr-TR";
+    utterance.rate = 1;
+    utterance.pitch = 1;
+
+    utterance.onend = () => {
+      const endedAt = Date.now();
+      const startedAt = this.currentAiTurnStartedAt ?? endedAt;
+      this.callbacks.onFinalTranscript({
+        speaker: "simulated_persona",
+        text: this.bootstrap.opening_line,
+        started_at: toIso(startedAt),
+        ended_at: toIso(endedAt),
+      });
+      this.currentAiTurnStartedAt = null;
+      this.callbacks.onModeChange("mic-active");
+    };
+
+    utterance.onerror = () => {
+      this.currentAiTurnStartedAt = null;
+      this.callbacks.onModeChange("mic-active");
+    };
+
+    window.setTimeout(() => {
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    }, INTRO_SPEECH_GRACE_MS);
   }
 }

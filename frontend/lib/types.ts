@@ -14,9 +14,20 @@ export type SessionResponse = {
 export type RealtimeTokenResponse = {
   session_id: string;
   provider: string;
+  task_id: string;
   websocket_url: string;
   ephemeral_token: string;
   voice_profile: string;
+  persona_name: string;
+  opening_line: string;
+};
+
+export type RealtimeTaskDebugResponse = {
+  task_id: string;
+  status: string | null;
+  pexit: string | null;
+  debugoutput: string | null;
+  errors: string[];
 };
 
 export type SessionEvent = {

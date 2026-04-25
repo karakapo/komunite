@@ -8,6 +8,7 @@ import { InterviewMode, RealtimeSessionController } from "../lib/realtime-sessio
 import {
   completeSession,
   createSession,
+  fetchRealtimeDebug,
   fetchRealtimeToken,
   fetchReport,
   fetchVisuals
@@ -22,6 +23,15 @@ import {
 } from "../lib/types";
 
 type AppStage = "intro" | "live" | "report";
+
+function shouldFetchRealtimeDebug(errorMessage: string): boolean {
+  return (
+    errorMessage.includes("zaman asimina ugradi") ||
+    errorMessage.includes("task_end gonderdi") ||
+    errorMessage.includes("websocket hatasi") ||
+    errorMessage.includes("baglanti baslatilamadi")
+  );
+}
 
 export default function Home() {
   const [scenario, setScenario] = useState<Scenario>("motivasyon");
@@ -59,15 +69,18 @@ export default function Home() {
       return;
     }
 
+    if (session && session.scenario === scenario) {
+      return;
+    }
+
     let active = true;
 
     async function prepareSession() {
       try {
-        setError(null);
         const nextSession = await createSession({
           task: "ai-study-planner-validation",
           scenario,
-          locale: "en-US"
+          locale: "tr-TR"
         });
 
         if (!active) {
@@ -89,7 +102,7 @@ export default function Home() {
     return () => {
       active = false;
     };
-  }, [scenario, stage]);
+  }, [scenario, session?.scenario, stage]);
 
   async function hydrateVisuals(sessionId: string) {
     if (visualsPollingRef.current) {
@@ -145,10 +158,31 @@ export default function Home() {
       setStage("live");
       await controller.start();
     } catch (nextError) {
+      let errorMessage =
+        nextError instanceof Error ? nextError.message : "Bilinmeyen bir hata olustu";
+
+      if (session && shouldFetchRealtimeDebug(errorMessage)) {
+        try {
+          const realtimeDebug = await fetchRealtimeDebug(session.id);
+          const debugParts = [
+            realtimeDebug.status ? `status=${realtimeDebug.status}` : null,
+            realtimeDebug.pexit ? `pexit=${realtimeDebug.pexit}` : null,
+            realtimeDebug.debugoutput ? `debug=${realtimeDebug.debugoutput}` : null,
+            realtimeDebug.errors.length > 0 ? `errors=${realtimeDebug.errors.join(", ")}` : null
+          ].filter(Boolean);
+
+          if (debugParts.length > 0) {
+            errorMessage = `${errorMessage} (${debugParts.join(" | ")})`;
+          }
+        } catch {
+          // Keep the original startup error if the debug lookup also fails.
+        }
+      }
+
       void realtimeControllerRef.current?.dispose();
       realtimeControllerRef.current = null;
       setStage("intro");
-      setError(nextError instanceof Error ? nextError.message : "Bilinmeyen bir hata olustu");
+      setError(errorMessage);
     } finally {
       setStarting(false);
     }

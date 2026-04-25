@@ -39,6 +39,8 @@ class RealtimeTokenResponse(BaseModel):
     websocket_url: str
     ephemeral_token: str
     voice_profile: str
+    persona_name: str
+    opening_line: str
 
 
 class SessionEvent(BaseModel):
@@ -80,6 +82,14 @@ class ReportResponse(BaseModel):
     next_steps: List[str]
 
 
+class RealtimeTaskDebugResponse(BaseModel):
+    task_id: str
+    status: str | None = None
+    pexit: str | None = None
+    debugoutput: str | None = None
+    errors: List[str] = Field(default_factory=list)
+
+
 class SessionRecord(BaseModel):
     id: str
     task: str
@@ -91,6 +101,7 @@ class SessionRecord(BaseModel):
     visual_status: VisualStatus = "pending"
     visuals: List[Visual]
     events: List[SessionEvent]
+    realtime_task_id: str | None = None
     transcript: List[TranscriptTurn] = Field(default_factory=list)
     report: ReportResponse | None = None
     created_at: datetime = Field(default_factory=utcnow)

@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.models import (
     CompleteSessionRequest,
+    RealtimeTaskDebugResponse,
     RealtimeTokenResponse,
     ReportResponse,
     SessionCreateRequest,
@@ -11,7 +12,13 @@ from app.models import (
     SessionResponse,
     Visual,
 )
-from app.services import build_realtime_bootstrap, build_report, create_session_record, make_event
+from app.services import (
+    build_realtime_bootstrap,
+    build_report,
+    create_session_record,
+    fetch_wiro_realtime_task_debug,
+    make_event,
+)
 from app.store import session_store
 
 app = FastAPI(title=settings.app_name)
@@ -59,6 +66,19 @@ def list_events(session_id: str) -> list[SessionEvent]:
         return session_store.get(session_id).events
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Session not found") from exc
+
+
+@app.get("/sessions/{session_id}/realtime-debug", response_model=RealtimeTaskDebugResponse)
+def get_realtime_debug(session_id: str) -> RealtimeTaskDebugResponse:
+    try:
+        session = session_store.get(session_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Session not found") from exc
+
+    if not session.realtime_task_id:
+        raise HTTPException(status_code=409, detail="Realtime task has not been created")
+
+    return fetch_wiro_realtime_task_debug(session.realtime_task_id)
 
 
 @app.get("/sessions/{session_id}/visuals", response_model=list[Visual])

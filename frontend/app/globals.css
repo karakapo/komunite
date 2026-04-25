@@ -109,6 +109,17 @@ textarea {
   line-height: 1.7;
 }
 
+.mic-notice {
+  max-width: 760px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(124, 242, 200, 0.24);
+  border-radius: 18px;
+  background: rgba(124, 242, 200, 0.08);
+  color: #dffdf2;
+  line-height: 1.5;
+}
+
 .stepper-row {
   display: flex;
   flex-wrap: wrap;

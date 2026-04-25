@@ -59,6 +59,9 @@ export WIRO_REALTIME_OWNER_SLUG="openai"
 export WIRO_REALTIME_MODEL_SLUG="gpt-realtime"
 export WIRO_REPORT_OWNER_SLUG="Qwen"
 export WIRO_REPORT_MODEL_SLUG="Qwen3.6-27B"
+# Optional: if the selected realtime model needs exact schema fields, override the
+# POST /Run payload completely with a JSON object string:
+# export WIRO_REALTIME_PAYLOAD_JSON='{"agent_id":"your-elevenlabs-agent-id"}'
 ```
 
 The backend now creates a real Wiro session by calling `POST https://api.wiro.ai/v1/Run/openai/gpt-realtime`

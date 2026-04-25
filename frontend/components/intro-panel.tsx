@@ -131,6 +131,10 @@ export function IntroPanel({
             gorusmeyi secip oyunu baslat.
           </p>
 
+          <div className="mic-notice">
+            Oyun sesli baslar. Tarayici mikrofon izni isteyecek ve karakter ilk cumleyi sesli soyleyecek.
+          </div>
+
           <div className="scenario-strip">
             {scenarioOptions.map((item) => {
               const isSelected = item.id === activeScenario.id;
@@ -177,7 +181,7 @@ export function IntroPanel({
                 Geri don
               </button>
               <button className="primary-button" onClick={onStart} disabled={starting} type="button">
-                {starting ? "Oyun hazirlaniyor..." : "Oyuna basla"}
+                {starting ? "Sesli gorusme hazirlaniyor..." : "Sesli gorusmeyi baslat"}
               </button>
             </div>
             <div className="background-status">

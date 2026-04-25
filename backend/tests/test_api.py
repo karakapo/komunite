@@ -139,3 +139,5 @@ def test_realtime_token_uses_wiro_bootstrap(monkeypatch) -> None:
     assert payload["task_id"] == "task-123"
     assert payload["ephemeral_token"] == "socket-token-abc"
     assert payload["websocket_url"] == "wss://socket.wiro.ai/v1"
+    assert payload["persona_name"] == "Zeynep"
+    assert payload["opening_line"]
